@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LOB Simulator — Bloomberg Terminal</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 13px;
+            min-height: 100vh;
+        }
+
+        /* ─── Top Bar ─────────────────────────────────────────── */
+        header {
+            background: #0d0d14;
+            border-bottom: 1px solid #ff6600;
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            background: #ff6600;
+            color: #000;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 3px 8px;
+            letter-spacing: 1px;
+        }
+
+        .brand-title {
+            color: #ff6600;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            color: #888;
+            font-size: 12px;
+        }
+
+        #ws-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #ws-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff3333;
+            transition: background 0.3s;
+        }
+
+        #ws-dot.connected {
+            background: #00cc44;
+            box-shadow: 0 0 6px #00cc44;
+        }
+
+        /* ─── Toolbar ─────────────────────────────────────────── */
+        .toolbar {
+            background: #111118;
+            border-bottom: 1px solid #222230;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-right: 4px;
+        }
+
+        .toolbar input[type="datetime-local"],
+        .toolbar select {
+            background: #1a1a26;
+            border: 1px solid #333348;
+            color: #e0e0e0;
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 12px;
+            outline: none;
+            border-radius: 2px;
+        }
+
+        .toolbar input[type="datetime-local"]:focus,
+        .toolbar select:focus {
+            border-color: #ff6600;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 24px;
+            background: #222230;
+        }
+
+        /* ─── Buttons ─────────────────────────────────────────── */
+        .btn {
+            padding: 5px 14px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: 1px solid;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: #ff6600;
+            border-color: #ff6600;
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            background: #ff8833;
+            border-color: #ff8833;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border-color: #444;
+            color: #aaa;
+        }
+
+        .btn-secondary:hover {
+            border-color: #ff6600;
+            color: #ff6600;
+        }
+
+        /* ─── Layout ──────────────────────────────────────────── */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            grid-template-rows: auto auto;
+            gap: 1px;
+            background: #111;
+            height: calc(100vh - 90px);
+        }
+
+        .panel {
+            background: #0d0d14;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: #111118;
+            border-bottom: 1px solid #1e1e2e;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+        }
+
+        .panel-header .panel-title {
+            color: #ff6600;
+            font-weight: bold;
+        }
+
+        /* ─── Main Chart ──────────────────────────────────────── */
+        .chart-panel {
+            grid-column: 1;
+            grid-row: 1 / 3;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #plot {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ─── Order Book Panel ────────────────────────────────── */
+        .orderbook-panel {
+            grid-column: 2;
+            grid-row: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #orderbook-plot {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ─── Trade Tape ──────────────────────────────────────── */
+        .tape-panel {
+            grid-column: 2;
+            grid-row: 2;
+            display: flex;
+            flex-direction: column;
+            max-height: 240px;
+        }
+
+        #trade-tape {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #333 #0d0d14;
+        }
+
+        .tape-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 3px 12px;
+            font-size: 11px;
+            border-bottom: 1px solid #0f0f1a;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .tape-row:hover {
+            background: #111118;
+        }
+
+        .tape-row.buy .tape-price {
+            color: #00cc44;
+        }
+
+        .tape-row.sell .tape-price {
+            color: #ff3333;
+        }
+
+        .tape-time {
+            color: #555;
+        }
+
+        .tape-qty {
+            color: #aaa;
+            text-align: right;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                background: #1a1a10;
+            }
+
+            to {
+                opacity: 1;
+                background: transparent;
+            }
+        }
+
+        /* ─── Status Bar ──────────────────────────────────────── */
+        .statusbar {
+            background: #0d0d14;
+            border-top: 1px solid #1e1e2e;
+            padding: 3px 16px;
+            display: flex;
+            gap: 24px;
+            font-size: 11px;
+            color: #555;
+        }
+
+        .statusbar span b {
+            color: #aaa;
+        }
+
+        #last-price-display {
+            color: #ff6600;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ─── Header ─────────────────────────────────────────── -->
+    <header>
+        <div class="brand">
+            <div class="brand-logo">LOB</div>
+            <div class="brand-title">Limit Order Book Simulator</div>
+        </div>
+        <div class="header-right">
+            <div id="ws-status">
+                <div id="ws-dot"></div>
+                <span id="ws-label">Disconnected</span>
+            </div>
+            <span id="clock">--:--:--</span>
+        </div>
+    </header>
+
+    <!-- ─── Toolbar ───────────────────────────────────────── -->
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <label>From</label>
+            <input type="datetime-local" id="start-date" />
+        </div>
+        <div class="toolbar-group">
+            <label>To</label>
+            <input type="datetime-local" id="end-date" />
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-group">
+            <label>Candle</label>
+            <select id="candle-interval">
+                <option value="5">5s</option>
+                <option value="15">15s</option>
+                <option value="30" selected>30s</option>
+                <option value="60">1m</option>
+                <option value="300">5m</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="apply-range">Apply</button>
+        <div class="toolbar-divider"></div>
+        <button class="btn btn-secondary" id="toggle-orderbook">
+            Show Order Book
+        </button>
+    </div>
+
+    <!-- ─── Main Layout ───────────────────────────────────── -->
+    <div class="main-layout">
+        <!-- Chart -->
+        <div class="panel chart-panel">
+            <div class="panel-header">
+                <span class="panel-title">OHLCV Chart</span>
+                <span id="last-price-display">—</span>
+            </div>
+            <div id="plot"></div>
+        </div>
+
+        <!-- Order Book Depth -->
+        <div class="panel orderbook-panel">
+            <div class="panel-header">
+                <span class="panel-title">Market Depth</span>
+            </div>
+            <div id="orderbook-plot" style="display: none"></div>
+        </div>
+
+        <!-- Trade Tape -->
+        <div class="panel tape-panel">
+            <div class="panel-header">
+                <span class="panel-title">Time & Sales</span>
+            </div>
+            <div id="trade-tape">
+                <div class="tape-row" style="color: #444; font-size: 11px; padding: 8px 12px">
+                    Waiting for trades…
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Status Bar ────────────────────────────────────── -->
+    <div class="statusbar">
+        <span>TRADES <b id="stat-trade-count">0</b></span>
+        <span>LAST <b id="stat-last-price">—</b></span>
+        <span>BID <b id="stat-best-bid" style="color: #00cc44">—</b></span>
+        <span>ASK <b id="stat-best-ask" style="color: #ff3333">—</b></span>
+    </div>
+
+    <script>
+        // ─── Clock ─────────────────────────────────────────────
+        function tickClock() {
+            const now = new Date();
+            document.getElementById("clock").textContent =
+                now.toLocaleTimeString("en-US", { hour12: false });
+        }
+        tickClock();
+        setInterval(tickClock, 1000);
+
+        // ─── Trade counter ─────────────────────────────────────
+        let tradeCount = 0;
+    </script>
+    <script src="script.js"></script>
+
+    <!-- ─── Tape appender (hooks into ws onmessage) ────────── -->
+    <script>
+        const tape = document.getElementById("trade-tape");
+        let tapeInitialized = false;
+
+        function appendToTape(trades) {
+            if (!tapeInitialized) {
+                tape.innerHTML = "";
+                tapeInitialized = true;
+            }
+            trades.forEach((t) => {
+                tradeCount++;
+                document.getElementById("stat-trade-count").textContent = tradeCount;
+                document.getElementById("stat-last-price").textContent =
+                    t.price.toFixed(2);
+                document.getElementById(
+                    "last-price-display"
+                ).textContent = `Last: ${t.price.toFixed(2)}`;
+
+                const row = document.createElement("div");
+                // Heuristic: if buyer initiated, show as buy (green), else sell (red)
+                row.className = "tape-row buy";
+                row.innerHTML = `
+            <span class="tape-time">${new Date(t.timestamp * 1000).toLocaleTimeString("en-US", { hour12: false })}</span>
+            <span class="tape-price">${t.price.toFixed(2)}</span>
+            <span class="tape-qty">${t.quantity}</span>
+          `;
+                tape.prepend(row);
+                // Keep tape trimmed
+                while (tape.children.length > 100) tape.removeChild(tape.lastChild);
+            });
+        }
+
+        // Hook into messages after script.js sets up ws
+        const _origOnMessage = ws.onmessage;
+        ws.onmessage = function (event) {
+            _origOnMessage && _origOnMessage.call(this, event);
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === "new_trades" && data.trades) {
+                    appendToTape(data.trades);
+                }
+                if (data.type === "order_book_update" && data.data) {
+                    const bids = Object.keys(data.data.bids || {});
+                    const asks = Object.keys(data.data.asks || {});
+                    if (bids.length)
+                        document.getElementById("stat-best-bid").textContent = Math.max(
+                            ...bids.map(Number)
+                        ).toFixed(2);
+                    if (asks.length)
+                        document.getElementById("stat-best-ask").textContent = Math.min(
+                            ...asks.map(Number)
+                        ).toFixed(2);
+                }
+            } catch (_) { }
+        };
+
+        // WS status indicator
+        const dot = document.getElementById("ws-dot");
+        const label = document.getElementById("ws-label");
+        const _origOpen = ws.onopen;
+        ws.onopen = function (e) {
+            dot.classList.add("connected");
+            label.textContent = "Live";
+            _origOpen && _origOpen.call(this, e);
+        };
+        const _origClose = ws.onclose;
+        ws.onclose = function (e) {
+            dot.classList.remove("connected");
+            label.textContent = "Disconnected";
+            _origClose && _origClose.call(this, e);
+        };
+    </script>
+</body>
+
+</html>

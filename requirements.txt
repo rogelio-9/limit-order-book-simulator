@@ -1,0 +1,4 @@
+websockets>=13.0
+websocket-client>=1.6
+sortedcontainers>=2.4
+aiosqlite>=0.20

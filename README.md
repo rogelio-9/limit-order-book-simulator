@@ -1,1 +1,1 @@
-# limit-order-book-simulator
+# Limit Order Book Simulator
